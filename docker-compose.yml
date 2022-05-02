@@ -1,0 +1,160 @@
+# docker-compose config file for OpenProject deployment
+#
+# Based on https://github.com/opf/openproject-deploy
+
+version: "3.7"
+
+networks:
+  frontend:
+  backend:
+
+volumes:
+  pgdata:
+  opdata:
+  certs:
+  vhost:
+  html:
+  acme:
+
+x-op-image: &image
+  image: openproject/community:12
+x-op-restart-policy: &restart_policy
+  restart: unless-stopped
+x-op-app: &app
+  <<: *image
+  <<: *restart_policy
+  volumes:
+    - "opdata:/var/openproject/assets"
+x-op-env: &env
+  RAILS_CACHE_STORE: "memcache"
+  OPENPROJECT_CACHE__MEMCACHE__SERVER: "cache:11211"
+  DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/openproject?pool=5&encoding=unicode&reconnect=true"
+  RAILS_MIN_THREADS: 1
+  RAILS_MAX_THREADS: 5
+  # Enable enterprise edition features for app evaluation
+  OPENPROJECT_EE__MANAGER__VISIBLE: "false"
+  # set to true to enable the email receiving feature. See ./docker/cron for more options
+  IMAP_ENABLED: "false"
+  SERVER_HOSTNAME:
+  SECRET_KEY_BASE:
+
+services:
+  db:
+    image: postgres:13
+    <<: *restart_policy
+    stop_grace_period: "3s"
+    volumes:
+      - "pgdata:/var/lib/postgresql/data"
+    environment:
+      POSTGRES_USER:
+      POSTGRES_PASSWORD:
+      POSTGRES_DB: openproject
+    networks:
+      - backend
+
+  cache:
+    image: memcached
+    <<: *restart_policy
+    networks:
+      - backend
+
+  seeder:
+    <<: *app
+    command: "./docker/prod/seeder"
+    restart: on-failure
+    networks:
+      - backend
+    environment:
+      <<: *env
+
+  worker:
+    <<: *app
+    command: "./docker/prod/worker"
+    networks:
+      - backend
+    depends_on:
+      - db
+      - cache
+      - seeder
+    environment:
+      <<: *env
+
+  cron:
+    <<: *app
+    command: "./docker/prod/cron"
+    networks:
+      - backend
+    depends_on:
+      - db
+      - cache
+      - seeder
+    environment:
+      <<: *env
+
+  web:
+    <<: *app
+    command: "./docker/prod/web"
+    networks:
+      - frontend
+      - backend
+    depends_on:
+      - db
+      - cache
+      - seeder
+    labels:
+      - autoheal=true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health_checks/default"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+    environment:
+      <<: *env
+      VIRTUAL_HOST: ${SERVER_HOSTNAME}
+      VIRTUAL_PORT: 8080
+      LETSENCRYPT_HOST: ${SERVER_HOSTNAME}
+
+  autoheal:
+    image: willfarrell/autoheal:1.2.0
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+    networks:
+      - backend
+
+  nginx-proxy:
+    image: nginxproxy/nginx-proxy
+    <<: *restart_policy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - certs:/etc/nginx/certs
+      - vhost:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+    depends_on:
+      - web
+    networks:
+      - frontend
+    labels:
+      - "com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy"
+
+  nginx-proxy-acme:
+    image: nginxproxy/acme-companion
+    <<: *restart_policy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - certs:/etc/nginx/certs
+      - vhost:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - acme:/etc/acme.sh
+    depends_on:
+      - nginx-proxy
+      - web
+    networks:
+      - frontend
+    environment:
+      DEFAULT_EMAIL: ${LETSENCRYPT_EMAIL}
