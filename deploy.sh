@@ -12,7 +12,11 @@ while :; do
         ;;
         --configure-firewall) configure_firewall=true
         ;;
-        *) break
+        -*|--*)
+          echo "unknown option: '$1'"
+          exit 1
+        ;;
+        *) break;
     esac
     shift
 done
