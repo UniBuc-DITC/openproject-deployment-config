@@ -33,6 +33,8 @@ x-op-env: &env
   RAILS_MAX_THREADS: 5
   # Enable enterprise edition features
   OPENPROJECT_EE__MANAGER__VISIBLE: "false"
+  # Disable password-based login
+  OPENPROJECT_DISABLE__PASSWORD__LOGIN: "true"
   # set to true to enable the email receiving feature. See ./docker/cron for more options
   IMAP_ENABLED: "false"
   SERVER_HOSTNAME:
