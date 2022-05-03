@@ -70,4 +70,5 @@ rsync -v 'docker-compose.yml' $env_vars_filename "$user@$hostname:$deployment_di
 echo 'Restarting the containers'
 ssh "$user@$hostname" "cd $deployment_dir && \
   docker compose stop && \
+  docker compose pull && \
   docker compose up -d"
