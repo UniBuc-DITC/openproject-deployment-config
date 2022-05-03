@@ -68,4 +68,6 @@ echo 'Copying files'
 rsync -v 'docker-compose.yml' $env_vars_filename "$user@$hostname:$deployment_dir"
 
 echo 'Restarting the containers'
-ssh "$user@$hostname" "cd $deployment_dir && docker compose up -d"
+ssh "$user@$hostname" "cd $deployment_dir && \
+  docker compose stop && \
+  docker compose up -d"
