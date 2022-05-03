@@ -31,7 +31,7 @@ x-op-env: &env
   DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/openproject?pool=5&encoding=unicode&reconnect=true"
   RAILS_MIN_THREADS: 1
   RAILS_MAX_THREADS: 5
-  # Enable enterprise edition features for app evaluation
+  # Enable enterprise edition features
   OPENPROJECT_EE__MANAGER__VISIBLE: "false"
   # set to true to enable the email receiving feature. See ./docker/cron for more options
   IMAP_ENABLED: "false"
