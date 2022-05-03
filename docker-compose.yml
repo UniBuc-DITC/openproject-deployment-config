@@ -35,7 +35,9 @@ x-op-env: &env
   OPENPROJECT_EE__MANAGER__VISIBLE: "false"
   # Disable password-based login
   OPENPROJECT_DISABLE__PASSWORD__LOGIN: "true"
-  # set to true to enable the email receiving feature. See ./docker/cron for more options
+  # We want to use username & password authentication for SMTP
+  SMTP_AUTHENTICATION: "login"
+  # We don't want to receive e-mail replies and parse them
   IMAP_ENABLED: "false"
   SERVER_HOSTNAME:
   SECRET_KEY_BASE:
