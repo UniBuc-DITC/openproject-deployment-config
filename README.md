@@ -5,6 +5,8 @@
 This repository contains the configuration files for the University of Bucharest's
 [OpenProject](https://www.openproject.org/) deployment, based on [Docker](https://www.docker.com/).
 
+We recommend also checking out the official [guide for a Docker-based OpenProject install](https://www.openproject.org/docs/installation-and-operations/installation/docker/).
+
 ## Requirements
 
 ### Hardware
@@ -18,43 +20,68 @@ Therefore, the minimum system requirements should be able to accomodate hundreds
 
 We recommend the latest LTS version of [Ubuntu Server](https://ubuntu.com/server) as the operating system.
 
+Having a firewall enabled is essential for securing your server. On Ubuntu Server, you can use [UFW](https://www.digitalocean.com/community/tutorials/how-to-set-up-a-firewall-with-ufw-on-ubuntu).
+
+You can use the following rules as a starting point:
+
+```shell
+ufw allow ssh
+ufw allow http
+ufw allow https
+ufw allow 6556/tcp
+ufw allow 161/udp
+ufw allow out 587/tcp
+ufw allow out 465/tcp
+ufw allow out 465/udp
+ufw show added
+```
+
+(besides SSH, HTTP and HTTPS, we also allow a few ports for [`checkmk`](https://checkmk.com/) and [SNMP](https://en.wikipedia.org/wiki/Simple_Network_Management_Protocol), which we use at UB)
+
 We also recommend installing [fail2ban](https://www.fail2ban.org/wiki/index.php/Main_Page) or similar software to protect against SSH key guessing attacks.
 
 ## Configuring the environment variables file
 
-Application secrets aren't kept in the `docker-compose.yml` file, but rather in an associated `.env` file.
-The name of this file is `.env.staging` for the staging environment, and simply `.env` for the production environment.
+Application secrets and configurable parameters aren't kept in the `compose.yaml` file, but rather in an associated `.env` file.
 
-The variables which need to be set in the env file are described below:
+The environment variables which **must** be set are:
 
 ```env
 POSTGRES_USER=openproject
 POSTGRES_PASSWORD=<randomly generated secure password>
 SERVER_HOSTNAME=<full domain name for your server>
-SECRET_KEY_BASE=<secret key generated above>
-LETSENCRYPT_EMAIL=<e-mail address where to send Let's Encrypt account messages>
+LETSENCRYPT_EMAIL=<e-mail address where Let's Encrypt will send account-related messages>
+ENTRA_TENANT_ID=<tenant ID>
+ENTRA_CLIENT_ID=<client ID for associated app registration>
+ENTRA_CLIENT_SECRET=<client secret>
 ```
 
-In order to generate a strong and secure database password or secret key base, you can use [OpenSSL](https://www.openssl.org/):
+The `ENTRA_*` variables are required for enabling authentication using Microsoft Entra ID. They can be obtained by following the steps [in the official documentation](https://www.openproject.org/docs/system-admin-guide/authentication/openid-providers/#azure-active-directory).
 
-```sh
-openssl rand -base64 32
+The following ones are optional, with sensible defaults being used if missing:
+
+```env
+OPENPROJECT_HTTPS=<true or false, enable or disable HTTPS support>
+OPENPROJECT_DISABLE__PASSWORD__LOGIN=<true or false, enable or disable password-based authentication>
 ```
+
+If you're testing out the deployment locally, you will want to set `OPENPROJECT_HTTPS=false` to avoid errors due to missing TLS certificates and `OPENPROJECT_DISABLE__PASSWORD__LOGIN=false` to be able to log in with the default admin account (which is username `admin`, password `admin`).
 
 ## Usage
 
-To create a new deployment or update an existing one, you can use the `deploy.sh` script.
+To create a new deployment or update an existing one, you have to:
 
-This script requires the following software to be installed in order to run:
-- [Bash](https://www.gnu.org/software/bash/)
-- [rsync](https://rsync.samba.org/)
-- an SSH client (such as [OpenSSH](https://www.openssh.com/))
+- [Clone](https://git-scm.com/docs/git-clone) this repository onto the target machine.
 
-Simply run the `deploy.sh` script from this directory, making sure that the appropriate `.env` file exists as well.
-You can pass the `--production` flag to deploy to production, otherwise the deployment is implicitly made to the staging environment.
+- Create a `.env` file with the variables described above.
 
-The script also accepts a `--configure-firewall` flag, which configures and enables [UFW](https://help.ubuntu.com/community/UFW).
-This flag is meant to be used only once, after the initial deployment.
+- Ensure you have the latest versions of all the container images by running `docker compose pull`.
+
+- If this is the first time you're starting the app, you'll have to wait until the database is initialized and all the migrations are perfromed. You can do so as a separate step by running `docker compose up db seeder`.
+
+  After the message `seeder-1 exited with code 0` is displayed, you can stop the containers by using `Ctrl` / `Cmd` + `C`.
+
+- Start all the app services by running `docker compose up --detach`. After a short while, the app should be available on the HTTP/HTTPS ports associated with your app.
 
 ## License
 
