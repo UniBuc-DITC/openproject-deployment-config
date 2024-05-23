@@ -77,7 +77,7 @@ To create a new deployment or update an existing one, you have to:
 
 - Ensure you have the latest versions of all the container images by running `docker compose pull`.
 
-- If this is the first time you're starting the app, you'll have to wait until the database is initialized and all the migrations are perfromed. You can do so as a separate step by running `docker compose up db seeder`.
+- If this is the first time you're starting the app, you'll have to wait until the database is initialized and all the migrations are perfromed. You can do so as a separate step by running `docker compose up cache db seeder`.
 
   After the message `seeder-1 exited with code 0` is displayed, you can stop the containers by using `Ctrl` / `Cmd` + `C`.
 
