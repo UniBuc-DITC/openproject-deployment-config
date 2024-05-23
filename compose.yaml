@@ -18,42 +18,50 @@ x-op-image: &image
   image: openproject/community:13
 x-op-restart-policy: &restart_policy
   restart: unless-stopped
+x-op-common-env: &common_env
+  OPENPROJECT_HTTPS: "${OPENPROJECT_HTTPS:-true}"
+  OPENPROJECT_HOST__NAME: "${SERVER_HOSTNAME:-localhost:8080}"
+  OPENPROJECT_HSTS: "${OPENPROJECT_HSTS:-true}"
+  RAILS_CACHE_STORE: "memcache"
+  OPENPROJECT_CACHE__MEMCACHE__SERVER: "cache:11211"
+  OPENPROJECT_RAILS__RELATIVE__URL__ROOT: "${OPENPROJECT_RAILS__RELATIVE__URL__ROOT:-}"
+  DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/openproject?pool=5&encoding=unicode&reconnect=true"
+  RAILS_MIN_THREADS: 1
+  RAILS_MAX_THREADS: 5
+  # Enable enterprise edition features
+  OPENPROJECT_EE__MANAGER__VISIBLE: "${OPENPROJECT_EE__MANAGER__VISIBLE:-false}"
+  # Disable password-based login
+  OPENPROJECT_DISABLE__PASSWORD__LOGIN: "${OPENPROJECT_DISABLE__PASSWORD__LOGIN:-true}"
+  # Microsoft 365 / Entra ID authentication support
+  OPENPROJECT_OPENID__CONNECT_ENTRA_DISPLAY__NAME: "Microsoft 365"
+  OPENPROJECT_OPENID__CONNECT_ENTRA_HOST: "login.microsoftonline.com"
+  OPENPROJECT_OPENID__CONNECT_ENTRA_IDENTIFIER: "${ENTRA_CLIENT_ID}"
+  OPENPROJECT_OPENID__CONNECT_ENTRA_SECRET: "${ENTRA_CLIENT_SECRET}"
+  OPENPROJECT_OPENID__CONNECT_ENTRA_AUTHORIZATION__ENDPOINT: "https://login.microsoftonline.com/${ENTRA_TENANT_ID}/oauth2/v2.0/authorize"
+  OPENPROJECT_OPENID__CONNECT_ENTRA_TOKEN__ENDPOINT: "https://login.microsoftonline.com/${ENTRA_TENANT_ID}/oauth2/v2.0/token"
+  OPENPROJECT_OPENID__CONNECT_ENTRA_USERINFO__ENDPOINT: "https://graph.microsoft.com/oidc/userinfo"
+  # We want to use username & password authentication for SMTP
+  SMTP_AUTHENTICATION: "login"
+  # We don't want to receive e-mail replies and parse them
+  IMAP_ENABLED: "false"
+  SERVER_HOSTNAME:
 x-op-app: &app
   <<: [*image, *restart_policy]
   environment:
-    OPENPROJECT_HTTPS: "${OPENPROJECT_HTTPS:-true}"
-    OPENPROJECT_HOST__NAME: "${SERVER_HOSTNAME:-localhost:8080}"
-    OPENPROJECT_HSTS: "${OPENPROJECT_HSTS:-true}"
-    RAILS_CACHE_STORE: "memcache"
-    OPENPROJECT_CACHE__MEMCACHE__SERVER: "cache:11211"
-    OPENPROJECT_RAILS__RELATIVE__URL__ROOT: "${OPENPROJECT_RAILS__RELATIVE__URL__ROOT:-}"
-    DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/openproject?pool=5&encoding=unicode&reconnect=true"
-    RAILS_MIN_THREADS: 1
-    RAILS_MAX_THREADS: 5
-    # Enable enterprise edition features
-    OPENPROJECT_EE__MANAGER__VISIBLE: "${OPENPROJECT_EE__MANAGER__VISIBLE:-false}"
-    # Disable password-based login
-    OPENPROJECT_DISABLE__PASSWORD__LOGIN: "${OPENPROJECT_DISABLE__PASSWORD__LOGIN:-true}"
-    # Microsoft 365 / Entra ID authentication support
-    OPENPROJECT_OPENID__CONNECT_ENTRA_DISPLAY__NAME: "Microsoft 365"
-    OPENPROJECT_OPENID__CONNECT_ENTRA_HOST: "login.microsoftonline.com"
-    OPENPROJECT_OPENID__CONNECT_ENTRA_IDENTIFIER: "${ENTRA_CLIENT_ID}"
-    OPENPROJECT_OPENID__CONNECT_ENTRA_SECRET: "${ENTRA_CLIENT_SECRET}"
-    OPENPROJECT_OPENID__CONNECT_ENTRA_AUTHORIZATION__ENDPOINT: "https://login.microsoftonline.com/${ENTRA_TENANT_ID}/oauth2/v2.0/authorize"
-    OPENPROJECT_OPENID__CONNECT_ENTRA_TOKEN__ENDPOINT: "https://login.microsoftonline.com/${ENTRA_TENANT_ID}/oauth2/v2.0/token"
-    OPENPROJECT_OPENID__CONNECT_ENTRA_USERINFO__ENDPOINT: "https://graph.microsoft.com/oidc/userinfo"
-    # We want to use username & password authentication for SMTP
-    SMTP_AUTHENTICATION: "login"
-    # We don't want to receive e-mail replies and parse them
-    IMAP_ENABLED: "false"
-    SERVER_HOSTNAME:
+    <<: *common_env
   volumes:
     - "${OPDATA:-opdata}:/var/openproject/assets"
-x-op-app-env: &app-env
+x-op-web-env: &web_env
+  <<: *common_env
+  VIRTUAL_HOST: ${SERVER_HOSTNAME}
+  VIRTUAL_PORT: 8080
+  LETSENCRYPT_HOST: ${SERVER_HOSTNAME}
+x-op-web-app: &web_app
+  <<: [*image, *restart_policy]
   environment:
-    VIRTUAL_HOST: ${SERVER_HOSTNAME}
-    VIRTUAL_PORT: 8080
-    LETSENCRYPT_HOST: ${SERVER_HOSTNAME}
+    <<: *web_env
+  volumes:
+    - "${OPDATA:-opdata}:/var/openproject/assets"
 
 services:
   db:
@@ -103,7 +111,7 @@ services:
       - seeder
 
   web:
-    <<: [*app, *app-env]
+    <<: *web_app
     command: "./docker/prod/web"
     networks:
       - frontend
